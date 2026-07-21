@@ -1,0 +1,65 @@
+# Kitob savdo boti
+
+Instagram → bot → Xolis QR to'lov → admin 1 klik tasdiqlaydi → PDF + kanal.
+
+## Struktura
+```
+kitob_bot/
+├── main.py               # вход: сборка роутеров, запуск polling
+├── config.py             # ВСЕ настройки (цена, карта, канал, пути)
+├── requirements.txt
+├── .env.example          # шаблон секретов
+├── database/
+│   └── db.py             # весь SQLite: заказы, статусы, статистика
+├── keyboards/
+│   └── inline.py         # все кнопки
+├── handlers/
+│   ├── user.py           # /start (+метка источника), меню, FAQ, вопросы→админу
+│   ├── payment.py        # счёт с QR, уникальная сумма, FSM скриншота
+│   └── admin.py          # ✅/❌ решение, выдача PDF+канала, /stats
+├── utils/
+│   ├── texts.py          # все тексты бота (узбекский)
+│   └── states.py         # FSM состояния
+└── files/                # ПОЛОЖИТЬ СЮДА: kitob.pdf, qr_xolis.jpg (персональный QR из Paynet Xolis)
+```
+
+## Запуск за 5 шагов
+1. `config.py`: карта, имя, ссылка канала (заявки на вступление — вкл!)
+2. `files/`: положить kitob.pdf, qr_xolis.jpg (персональный QR из Paynet Xolis)
+3. Секреты: локально — файл `.env` не нужен, просто export;
+   Railway — Variables: BOT_TOKEN, ADMIN_ID
+4. `pip install -r requirements.txt`
+5. `python main.py`
+
+## Метки источников (аналитика бесплатно)
+В Instagram давайте ссылки вида:
+- t.me/ВАШ_БОТ?start=bio      (шапка профиля)
+- t.me/ВАШ_БОТ?start=reels1   (конкретный ролик)
+`/stats` покажет, какой источник приносит покупателей.
+
+
+## Что нового в v2 (аудит)
+- HTML-экранирование имён — имя `<Ali>` не ломает бота
+- Ошибки доставки: покупатель заблокировал бота / нет PDF → админ видит алерт с ID
+- Старая кнопка «To'lov qildim» не оживляет закрытый заказ
+- ❌ нельзя нажать по уже оплаченному заказу
+- Восстановление после рестарта: скрин без FSM-состояния всё равно принимается
+- Ответы на вопросы: админ делает reply на пересланное сообщение → бот доставляет автору
+- config.validate() при старте: понятные ошибки вместо загадочных падений
+- parse_mode=HTML глобально, Procfile для Railway
+
+
+## v3: оплата ТОЛЬКО через Paynet Xolis
+- Один QR (files/qr_xolis.jpg) — покупатель сканирует Payme/Click/банком
+- Уникальная сумма 69 0XX опознаёт платёж; сверка: Xolis → Tushumlar tarixi
+- Легально: самозанятый, налог 1% удерживается автоматически, покупателю — фискальный чек
+- В config.py: XOLIS_WALLET (номер бизнес-кошелька, показывается в счёте)
+
+
+## v4: после внешнего аудита (Kimi 2.6) — принято выборочно
+ПРИНЯТО: проверка владельца заказа (подделка callback_data), html.escape
+ответа админа, атомарные confirm/reject (гонка двух админов), WAL mode,
+ADMIN_IDS списком (env: ADMIN_IDS="111,222"), DB_PATH через env
+(для Railway Volume), анти-спам middleware БЕЗ зависимостей, python-dotenv.
+ОТКЛОНЕНО: Redis (восстановление уже решено через SQLite-recovery; лишний
+сервис), логи в файл (Railway читает stdout, ФС эфемерна), cachetools.
