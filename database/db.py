@@ -9,19 +9,48 @@ database/db.py — ВСЯ РАБОТА С БАЗОЙ (SQLite).
   paid     — подтверждено, книга выдана
   rejected — отклонено админом
 
-[FIX v2] set_waiting проверяет статус (нельзя "оживить" отклонённый заказ
-         старой кнопкой), reject не трогает уже оплаченные,
-         + find_open_order (восстановление после рестарта),
-         + таблица threads (ответы админа на вопросы покупателей).
+Версии:
+  v2   — set_waiting проверяет статус (нельзя "оживить" отклонённый заказ),
+         reject не трогает оплаченные, find_open_order (восстановление
+         после рестарта), таблица threads (ответы админа покупателям)
+  v4   — проверка ВЛАДЕЛЬЦА заказа, атомарные confirm/reject, WAL
+  v5   — запросы для админ-панели: pending, recent, база покупателей
+  v5.2 — авто-создание каталога базы (_ensure_db_dir)
 """
+import logging
+import os
 import random
 import sqlite3
 from datetime import datetime
 
 from config import DB_PATH, BASE_PRICE, PRICE_TAIL_MAX
 
+log = logging.getLogger(__name__)
+
+
+def _ensure_db_dir() -> None:
+    """
+    [v5.2] Гарантируем, что каталог для базы существует.
+    Типичный случай: DB_PATH=/data/sales.db, а Railway Volume не примонтирован —
+    раньше бот падал с 'unable to open database file'. Теперь каталог
+    создаётся автоматически, а в лог идёт понятное предупреждение.
+    """
+    d = os.path.dirname(DB_PATH)
+    if d and not os.path.isdir(d):
+        try:
+            os.makedirs(d, exist_ok=True)
+            log.warning(
+                "DB katalogi yaratildi: %s — Railway Volume ulanmagan bo'lsa, "
+                "ma'lumotlar redeploy'da yo'qoladi!", d)
+        except OSError as e:
+            log.error(
+                "DB katalogini yaratib bo'lmadi (%s): %s. "
+                "Railway: Volume mount path = %s ekanini tekshiring.", d, e, d)
+            raise
+
 
 def _connect() -> sqlite3.Connection:
+    _ensure_db_dir()
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")       # [v4] меньше блокировок
