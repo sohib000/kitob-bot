@@ -77,3 +77,11 @@ ADMIN_IDS списком (env: ADMIN_IDS="111,222"), DB_PATH через env
 Также в v5: _mark_card умеет помечать и фото-карточки, и текстовые
 (из списка pending); v4.1 — любая команда снимает ожидание скриншота,
 чтобы пользователь не запирался в FSM; /admin как алиас /stats.
+
+
+## v5.1 — CHANNEL_LINK через env
+Ссылка канала читается из переменной окружения CHANNEL_LINK
+(Railway → Variables). Раньше она лежала в config.py и терялась
+при обновлении кода из архива. Теперь обновления безопасны.
+Обязательные Variables: BOT_TOKEN, ADMIN_IDS, CHANNEL_LINK
+(+ DB_PATH=/data/sales.db при подключённом Volume).

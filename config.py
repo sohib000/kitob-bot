@@ -37,8 +37,9 @@ PRICE_TAIL_MAX: int = 299                            # «хвост» уника
 XOLIS_WALLET: str = "8888 0111 2434 0958"            # ← ваш кошелёк из Xolis
 
 # ---------- КАНАЛ-БОНУС ----------
-CHANNEL_LINK: str = "https://t.me/+XXXXXXXX"         # пригласительная ссылка
-                                                     # (включите «заявки на вступление»!)
+# [v5.1] Ссылка канала — из переменных окружения (Railway Variables),
+# чтобы обновление кода НИКОГДА её не затирало.
+CHANNEL_LINK: str = os.getenv("CHANNEL_LINK", "https://t.me/+Z68fr1kYMawyYjVi")
 
 # ---------- ФАЙЛЫ ----------
 FILES_DIR = os.path.join(os.path.dirname(__file__), "files")
@@ -66,5 +67,5 @@ def validate() -> list[str]:
     if not os.path.exists(QR_XOLIS):
         problems.append(f"Xolis QR topilmadi: {QR_XOLIS} — bu YAGONA to'lov usuli, majburiy!")
     if "XXXXXXXX" in CHANNEL_LINK:
-        problems.append("CHANNEL_LINK hali shablon holida — kanal havolasini qo'ying")
+        problems.append("CHANNEL_LINK yo'q — Railway Variables'ga CHANNEL_LINK qo'shing")
     return problems
