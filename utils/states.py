@@ -12,3 +12,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 class Payment(StatesGroup):
     waiting_screenshot = State()   # ждём фото чека от покупателя
+
+
+class Broadcast(StatesGroup):
+    waiting_content = State()   # [v5] админ готовит сообщение для рассылки

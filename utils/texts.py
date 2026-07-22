@@ -132,3 +132,36 @@ STATS = (
     "⏳ Tasdiq kutmoqda: {waiting}\n\n"
     "📍 Manbalar (start bosganlar):\n{sources}"
 )
+
+STATE_CANCELLED = (
+    "✅ Kutish bekor qilindi.\n"
+    "Davom etish uchun /start bosing yoki menyudan tanlang."
+)
+
+
+# ---------- [v5] АДМИН-ПАНЕЛЬ ----------
+ADMIN_MENU = "🛠 <b>Admin panel</b>\nBo'limni tanlang 👇"
+
+ADMIN_NO_PENDING = "✅ Kutilayotgan buyurtmalar yo'q — hammasi yopilgan."
+
+ADMIN_PENDING_ITEM = (
+    "🧾 №{oid} • <b>{amount} so'm</b>\n"
+    "👤 {full_name} {username} (<code>{user_id}</code>)\n"
+    "🕘 {created}"
+)
+
+ADMIN_RECENT_HEADER = "🕘 <b>Oxirgi buyurtmalar</b>\n"
+ADMIN_RECENT_ITEM = "{icon} №{oid} • {amount} so'm • {name} • {source}"
+
+BC_ASK = (
+    "📣 <b>Xabar yuborish</b>\n\n"
+    "Xaridorlarga yuboriladigan xabarni yozing (matn/rasm bo'lishi mumkin).\n"
+    "Bekor qilish: /admin"
+)
+BC_PREVIEW = (
+    "👆 Xabar shu ko'rinishda ketadi.\n"
+    "Qabul qiluvchilar: <b>{count} ta xaridor</b>.\nYuboramizmi?"
+)
+BC_NO_BUYERS = "Hozircha xaridorlar yo'q — yuboradigan hech kim topilmadi."
+BC_DONE = "📣 Yuborildi: <b>{ok}</b> ta ✅ | yetmadi (blok): {fail} ta"
+BC_CANCELLED = "Bekor qilindi."

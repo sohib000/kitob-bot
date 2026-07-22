@@ -106,6 +106,13 @@ async def got_screenshot(message: Message, state: FSMContext, bot: Bot):
     await message.answer(texts.SCREENSHOT_RECEIVED)
 
 
+# ---------- КОМАНДА ВО ВРЕМЯ ОЖИДАНИЯ СКРИНА [FIX v4.1] ----------
+@router.message(Payment.waiting_screenshot, F.text.startswith("/"))
+async def command_in_waiting(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer(texts.STATE_CANCELLED)
+
+
 # ---------- ШАГ 3б: НЕ ФОТО ----------
 @router.message(Payment.waiting_screenshot)
 async def not_photo(message: Message):

@@ -213,3 +213,31 @@ def get_thread_user(admin_msg_id: int) -> int | None:
             "SELECT user_id FROM threads WHERE admin_msg_id=?", (admin_msg_id,)
         ).fetchone()
         return row["user_id"] if row else None
+
+
+# ---------- [v5] АДМИН-ПАНЕЛЬ ----------
+def get_pending_orders() -> list:
+    """Заказы в ожидании подтверждения (waiting) — свежие сверху."""
+    with _connect() as conn:
+        return conn.execute(
+            "SELECT id, user_id, username, full_name, amount, created "
+            "FROM orders WHERE status='waiting' ORDER BY id DESC LIMIT 20"
+        ).fetchall()
+
+
+def get_recent_orders(limit: int = 10) -> list:
+    """Последние заказы любого статуса."""
+    with _connect() as conn:
+        return conn.execute(
+            "SELECT id, username, full_name, amount, status, source, created "
+            "FROM orders ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+
+
+def get_buyer_ids() -> list[int]:
+    """Уникальные user_id всех, кто КУПИЛ (для рассылки)."""
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT user_id FROM orders WHERE status='paid'"
+        ).fetchall()
+        return [r["user_id"] for r in rows]

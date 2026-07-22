@@ -25,9 +25,13 @@ from aiogram.types import Message, CallbackQuery, FSInputFile
 
 import html as _html
 
+import asyncio
+
+from aiogram.fsm.context import FSMContext
 from config import ADMIN_IDS, PDF_FILE
 from database import db
 from keyboards import inline as kb
+from utils.states import Broadcast
 from utils import texts
 
 router = Router(name="admin")
@@ -39,12 +43,20 @@ def _fmt(n: int) -> str:
 
 
 async def _mark_card(callback: CallbackQuery, suffix: str) -> None:
-    """Помечаем карточку у админа; сбой редактирования не критичен."""
+    """
+    Помечаем карточку у админа; сбой редактирования не критичен.
+    [v5] Карточка бывает фото (скрин чека) ИЛИ текстом (список pending) —
+    редактируем соответствующим методом.
+    """
     try:
-        await callback.message.edit_caption(
-            caption=(callback.message.caption or "") + suffix)
+        if callback.message.photo:
+            await callback.message.edit_caption(
+                caption=(callback.message.caption or "") + suffix)
+        else:
+            await callback.message.edit_text(
+                (callback.message.text or "") + suffix)
     except TelegramAPIError as e:
-        log.warning("edit_caption failed: %s", e)
+        log.warning("mark card failed: %s", e)
 
 
 # ---------- ПОДТВЕРДИТЬ ----------
@@ -101,16 +113,124 @@ async def cb_reject(callback: CallbackQuery, bot: Bot):
     await callback.answer("Rad etildi")
 
 
-# ---------- /stats ----------
-@router.message(Command("stats"))
-async def cmd_stats(message: Message):
+# ---------- [v5] АДМИН-ПАНЕЛЬ: /admin и /stats открывают меню ----------
+@router.message(Command("stats", "admin"))
+async def cmd_admin(message: Message):
     if message.from_user.id not in ADMIN_IDS:
         return
+    await message.answer(texts.ADMIN_MENU, reply_markup=kb.admin_menu())
+
+
+def _stats_text() -> str:
     s = db.get_stats()
     sources = "\n".join(f"  • {name}: {n}" for name, n in s["sources"]) or "—"
-    await message.answer(texts.STATS.format(
+    return texts.STATS.format(
         total=s["total"], today=s["today"],
-        revenue=_fmt(s["revenue"]), waiting=s["waiting"], sources=sources))
+        revenue=_fmt(s["revenue"]), waiting=s["waiting"], sources=sources)
+
+
+@router.callback_query(F.data == "adm:stats")
+async def cb_adm_stats(callback: CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        return await callback.answer()
+    await callback.message.answer(_stats_text())
+    await callback.answer()
+
+
+# ---------- [v5] СПИСОК ОЖИДАЮЩИХ: карточки с кнопками ✅/❌ ----------
+# Решает проблему «карточка потерялась в переписке»: заказ подтверждается
+# из этого списка теми же ok:/no: колбэками.
+@router.callback_query(F.data == "adm:pending")
+async def cb_adm_pending(callback: CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        return await callback.answer()
+    rows = db.get_pending_orders()
+    if not rows:
+        await callback.message.answer(texts.ADMIN_NO_PENDING)
+        return await callback.answer()
+    import html as _h
+    for r in rows:
+        uname = f"@{r['username']}" if r["username"] else "(username yo'q)"
+        await callback.message.answer(
+            texts.ADMIN_PENDING_ITEM.format(
+                oid=r["id"], amount=_fmt(r["amount"]),
+                full_name=_h.escape(r["full_name"] or ""),
+                username=_h.escape(uname),
+                user_id=r["user_id"], created=r["created"][:16].replace("T", " ")),
+            reply_markup=kb.admin_decision(r["id"]))
+    await callback.answer()
+
+
+# ---------- [v5] ПОСЛЕДНИЕ ЗАКАЗЫ ----------
+@router.callback_query(F.data == "adm:recent")
+async def cb_adm_recent(callback: CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        return await callback.answer()
+    rows = db.get_recent_orders(10)
+    icons = {"paid": "✅", "waiting": "⏳", "rejected": "❌", "new": "🆕"}
+    import html as _h
+    lines = [texts.ADMIN_RECENT_HEADER]
+    for r in rows:
+        name = _h.escape(r["full_name"] or r["username"] or "-")
+        lines.append(texts.ADMIN_RECENT_ITEM.format(
+            icon=icons.get(r["status"], "•"), oid=r["id"],
+            amount=_fmt(r["amount"]), name=name, source=r["source"] or "direct"))
+    await callback.message.answer("\n".join(lines) if rows else "Buyurtmalar yo'q.")
+    await callback.answer()
+
+
+# ---------- [v5] РАССЫЛКА ПО ПОКУПАТЕЛЯМ ----------
+@router.callback_query(F.data == "adm:bc")
+async def cb_adm_bc(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id not in ADMIN_IDS:
+        return await callback.answer()
+    if not db.get_buyer_ids():
+        await callback.message.answer(texts.BC_NO_BUYERS)
+        return await callback.answer()
+    await state.set_state(Broadcast.waiting_content)
+    await callback.message.answer(texts.BC_ASK)
+    await callback.answer()
+
+
+@router.message(Broadcast.waiting_content, F.from_user.id.in_(ADMIN_IDS))
+async def bc_content(message: Message, state: FSMContext, bot: Bot):
+    # /admin и любая команда отменяют рассылку
+    if message.text and message.text.startswith("/"):
+        await state.clear()
+        return await message.answer(texts.BC_CANCELLED)
+    # предпросмотр: копия сообщения + подтверждение
+    await bot.copy_message(message.chat.id, message.chat.id, message.message_id)
+    await state.update_data(chat_id=message.chat.id, msg_id=message.message_id)
+    count = len(db.get_buyer_ids())
+    await message.answer(texts.BC_PREVIEW.format(count=count),
+                         reply_markup=kb.broadcast_confirm())
+
+
+@router.callback_query(F.data == "bc:cancel")
+async def bc_cancel(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.answer(texts.BC_CANCELLED)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "bc:go")
+async def bc_go(callback: CallbackQuery, state: FSMContext, bot: Bot):
+    if callback.from_user.id not in ADMIN_IDS:
+        return await callback.answer()
+    data = await state.get_data()
+    await state.clear()
+    if "msg_id" not in data:
+        return await callback.answer("Xabar topilmadi, qaytadan boshlang", show_alert=True)
+    ok = fail = 0
+    for uid in db.get_buyer_ids():
+        try:
+            await bot.copy_message(uid, data["chat_id"], data["msg_id"])
+            ok += 1
+        except TelegramAPIError:
+            fail += 1
+        await asyncio.sleep(0.1)          # мягкий rate-limit
+    await callback.message.answer(texts.BC_DONE.format(ok=ok, fail=fail))
+    await callback.answer("Tayyor")
 
 
 # ---------- ОТВЕТ НА ВОПРОС ПОКУПАТЕЛЯ [NEW] ----------

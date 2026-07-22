@@ -47,3 +47,20 @@ def retry_button() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🛒 Qayta urinish", callback_data="buy")],
         [InlineKeyboardButton(text="❓ Savol yozish", callback_data="faq")],
     ])
+
+
+# ---------- [v5] АДМИН-ПАНЕЛЬ ----------
+def admin_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📊 Statistika", callback_data="adm:stats")],
+        [InlineKeyboardButton(text="⏳ Kutilayotganlar", callback_data="adm:pending")],
+        [InlineKeyboardButton(text="🕘 Oxirgi 10 ta", callback_data="adm:recent")],
+        [InlineKeyboardButton(text="📣 Xaridorlarga xabar", callback_data="adm:bc")],
+    ])
+
+
+def broadcast_confirm() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Yuborish", callback_data="bc:go"),
+         InlineKeyboardButton(text="❌ Bekor", callback_data="bc:cancel")],
+    ])
